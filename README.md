@@ -1,81 +1,118 @@
-# IoT Cloud Integration and Real-Time Remote Monitoring Using ESP32:
+# IoT-based control system using ESP32 and cloud platforms.
 Smart Temperature Automation System with LCD, Fan & Buzzer
-Components Used
-ESP32 Microcontroller
-Sensor (Temperature / Light / Motion)
+🔧 Components Used
+ESP32 Development Board
+(Main microcontroller with built-in WiFi for IoT communication)
+Relay Module (4-Channel / Single Channel)
+(Used to control AC/DC loads like fan, motor, etc.)
+LEDs (Light Emitting Diodes)
+(For indication and basic output control)
+Resistors (220Ω / 330Ω)
+(Current limiting for LEDs)
+Jumper Wires
+(For circuit connections)
 Breadboard
-Jumper wires
-USB cable
-WiFi connection
-Arduino IDE
-ThingSpeak IoT cloud platform
-Wokwi ESP32 simulator (optional)
+(For prototyping and assembling the circuit)
+5V Power Supply / USB Cable
+(To power the ESP32 and connected components)
+DC Loads
+5V DC Motor
+5V DC Fan
+WiFi Network (Router/Hotspot)
+(Required for ESP32 internet connectivity)
 
 ![Circuit](C:\Users\kusum\OneDrive\Desktop\TASK - 1.png)
 Code : 
+#define BLYNK_PRINT Serial
+
 #include <WiFi.h>
-#include <HTTPClient.h>
+#include <BlynkSimpleEsp32.h>
 
-// WiFi credentials
-const char* ssid = "YOUR_WIFI_NAME";
-const char* password = "YOUR_WIFI_PASSWORD";
+// ----------- WiFi Credentials -----------
+char ssid[] = "YOUR_WIFI_NAME";
+char pass[] = "YOUR_WIFI_PASSWORD";
 
-// ThingSpeak API Key
-String apiKey = "YOUR_THINGSPEAK_WRITE_API_KEY";
+// ----------- Blynk Auth Token -----------
+char auth[] = "YOUR_BLYNK_AUTH_TOKEN";
 
-const char* server = "http://api.thingspeak.com/update";
+// ----------- Relay Pins -----------
+#define RELAY1 26   // Motor
+#define RELAY2 27   // Fan
 
-int sensorPin = 34;   // Analog sensor connected to GPIO 34
-int sensorValue;
+// ----------- LED Pin -----------
+#define LED 2
 
+// ----------- Variables -----------
+bool autoMode = false;
+
+// ----------- Blynk Virtual Pins -----------
+// V0 -> Motor Control
+// V1 -> Fan Control
+// V2 -> LED Control
+// V3 -> Auto Mode Toggle
+
+// ----------- Motor Control -----------
+BLYNK_WRITE(V0) {
+  int value = param.asInt();
+  if (!autoMode) {
+    digitalWrite(RELAY1, value);
+  }
+}
+
+// ----------- Fan Control -----------
+BLYNK_WRITE(V1) {
+  int value = param.asInt();
+  if (!autoMode) {
+    digitalWrite(RELAY2, value);
+  }
+}
+
+// ----------- LED Control -----------
+BLYNK_WRITE(V2) {
+  int value = param.asInt();
+  digitalWrite(LED, value);
+}
+
+// ----------- Auto Mode Toggle -----------
+BLYNK_WRITE(V3) {
+  autoMode = param.asInt();
+}
+
+// ----------- Setup -----------
 void setup() {
   Serial.begin(115200);
 
-  // Connect to WiFi
-  WiFi.begin(ssid, password);
-  Serial.print("Connecting to WiFi");
+  pinMode(RELAY1, OUTPUT);
+  pinMode(RELAY2, OUTPUT);
+  pinMode(LED, OUTPUT);
 
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(1000);
-    Serial.print(".");
-  }
+  digitalWrite(RELAY1, LOW);
+  digitalWrite(RELAY2, LOW);
+  digitalWrite(LED, LOW);
 
-  Serial.println("\nWiFi Connected!");
+  // Connect to WiFi & Blynk
+  Blynk.begin(auth, ssid, pass);
+
+  Serial.println("System Ready...");
 }
 
-void loop() {
+// ----------- Automation Logic -----------
+void automationLogic() {
+  if (autoMode) {
+    // Example logic: alternate ON/OFF every 5 seconds
+    digitalWrite(RELAY1, HIGH);
+    digitalWrite(RELAY2, LOW);
+    delay(5000);
 
-  // Read sensor value
-  sensorValue = analogRead(sensorPin);
-
-  Serial.print("Sensor Value: ");
-  Serial.println(sensorValue);
-
-  // Send data to ThingSpeak
-  if (WiFi.status() == WL_CONNECTED) {
-
-    HTTPClient http;
-
-    String url = server;
-    url += "?api_key=" + apiKey;
-    url += "&field1=" + String(sensorValue);
-
-    http.begin(url);
-
-    int httpResponseCode = http.GET();
-
-    if (httpResponseCode > 0) {
-      Serial.print("Data sent. Response code: ");
-      Serial.println(httpResponseCode);
-    } 
-    else {
-      Serial.print("Error sending data: ");
-      Serial.println(httpResponseCode);
-    }
-
-    http.end();
+    digitalWrite(RELAY1, LOW);
+    digitalWrite(RELAY2, HIGH);
+    delay(5000);
   }
+}
 
-  // ThingSpeak requires minimum 15 seconds delay
-  delay(15000);
+// ----------- Loop -----------
+void loop() {
+  Blynk.run();
+
+  automationLogic();
 }
